@@ -85,29 +85,6 @@
     opacity: 0.85;
   }
 
-  .video-frame {
-    position: relative;
-    width: 100%;
-    max-width: 360px;
-    margin: 0 auto;
-    aspect-ratio: 9 / 16;
-    border-radius: 18px;
-    overflow: hidden;
-    border: 3px solid #ffffff22;
-    box-shadow:
-      0 0 0 4px #000,
-      0 0 30px var(--glow),
-      0 0 60px var(--glow2);
-    background: #000;
-  }
-
-  .video-frame iframe {
-    width: 100%;
-    height: 100%;
-    border: 0;
-    display: block;
-  }
-
   .caption {
     margin-top: 22px;
     color: #fff;
@@ -187,6 +164,120 @@
     font-size: 13px;
     opacity: 0.6;
   }
+
+  /* ---------- Tic Tac Toe ---------- */
+  .game-wrap {
+    max-width: 380px;
+    margin: 0 auto 20px;
+  }
+
+  .game-status {
+    color: #fff;
+    font-size: clamp(15px, 3vw, 19px);
+    margin-bottom: 18px;
+    min-height: 28px;
+    text-shadow: 0 0 10px var(--glow2);
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  .cell {
+    aspect-ratio: 1 / 1;
+    background: #ffffff0d;
+    border: 2px solid #ffffff22;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(28px, 8vw, 44px);
+    cursor: pointer;
+    color: #fff;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .cell:hover:not(.taken) {
+    background: #ffffff1a;
+    border-color: var(--glow2);
+    transform: scale(1.04);
+  }
+
+  .cell.taken {
+    cursor: default;
+  }
+
+  .cell.win {
+    border-color: var(--glow3);
+    box-shadow: 0 0 18px var(--glow3);
+  }
+
+  .game-controls {
+    margin-top: 20px;
+  }
+
+  .game-btn {
+    background: #ffffff12;
+    border: 1px solid #ffffff33;
+    color: #fff;
+    padding: 10px 22px;
+    border-radius: 999px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+
+  .game-btn:hover {
+    background: #ffffff22;
+    transform: scale(1.04);
+  }
+
+  /* celebration overlay */
+  .celebration {
+    display: none;
+    margin: 26px auto 0;
+    max-width: 320px;
+    padding: 22px 18px;
+    border-radius: 20px;
+    background: #ffffff0d;
+    border: 2px solid var(--glow3);
+    box-shadow: 0 0 30px var(--glow3);
+  }
+
+  .celebration.show {
+    display: block;
+    animation: pop-in 0.35s ease;
+  }
+
+  @keyframes pop-in {
+    0% { transform: scale(0.7); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .dancer {
+    font-size: 64px;
+    display: inline-block;
+    animation: dance 0.55s ease-in-out infinite;
+  }
+
+  @keyframes dance {
+    0%   { transform: translateY(0) rotate(-12deg); }
+    25%  { transform: translateY(-14px) rotate(10deg); }
+    50%  { transform: translateY(0) rotate(-8deg) scaleX(-1); }
+    75%  { transform: translateY(-14px) rotate(10deg) scaleX(-1); }
+    100% { transform: translateY(0) rotate(-12deg); }
+  }
+
+  .celebration p {
+    color: #fff;
+    margin: 10px 0 0;
+    font-size: 16px;
+  }
 </style>
 </head>
 <body>
@@ -198,15 +289,20 @@
     <h1>scuba cat 🤿✨</h1>
     <p class="subtitle"> 🕺🐈</p>
 
-    <div class="video-frame">
-      <!-- Embedded via YouTube's official embed player -->
-      <iframe
-        src="https://www.youtube.com/embed/Y7WqiO-PNZA?rel=0&loop=1&playlist=Y7WqiO-PNZA"
-        title="Scuba Cat Dance"
-        frameborder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowfullscreen
-      ></iframe>
+    <div class="game-wrap">
+      <h2 class="section-title">tic tac toe 🎮</h2>
+      <p class="game-status" id="gameStatus">your move! you're ❌</p>
+
+      <div class="board" id="board"></div>
+
+      <div class="celebration" id="celebration">
+        <div class="dancer" id="dancerEmoji">🐱</div>
+        <p id="celebrationText">you won! the cat is celebrating 🎉</p>
+      </div>
+
+      <div class="game-controls">
+        <button class="game-btn" id="resetBtn">play again 🔄</button>
+      </div>
     </div>
 
     <p class="caption">🐾 made with cuteness and chaos 🐾</p>
@@ -285,11 +381,204 @@
   }
 
   buildStickerWall();
-  // wait a tick so layout (including the wall + video) is in the DOM
-  // before measuring full page height for floating stickers
   window.addEventListener('load', scatterFloatingStickers);
-  // also run immediately in case load already fired
   scatterFloatingStickers();
+
+  /* ================= TIC TAC TOE ================= */
+  const HUMAN = 'X';
+  const BOT = 'O';
+  const WIN_LINES = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  let cells = Array(9).fill(null);
+  let gameOver = false;
+  // roughly 1 in 2 games should end in a human win.
+  // We pick the "fate" of this game up front:
+  //  - "win"  -> bot plays weak/random moves, human likely wins
+  //  - "lose" -> bot plays perfect/near-perfect, human likely loses or draws
+  let gameFate = pickFate();
+
+  function pickFate() {
+    return Math.random() < 0.5 ? 'win' : 'lose';
+  }
+
+  const boardEl = document.getElementById('board');
+  const statusEl = document.getElementById('gameStatus');
+  const celebrationEl = document.getElementById('celebration');
+  const dancerEl = document.getElementById('dancerEmoji');
+  const celebrationTextEl = document.getElementById('celebrationText');
+  const resetBtn = document.getElementById('resetBtn');
+
+  const dancers = ['🐱','🐶'];
+  const dancerCelebrationLines = [
+    'you won! someone is celebrating 🎉',
+    'gg! the dance floor is open 🕺',
+    'victory dance unlocked ✨'
+  ];
+
+  function renderBoard() {
+    boardEl.innerHTML = '';
+    cells.forEach((val, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (val ? ' taken' : '');
+      cell.textContent = val || '';
+      cell.dataset.index = i;
+      cell.addEventListener('click', () => handleHumanMove(i));
+      boardEl.appendChild(cell);
+    });
+  }
+
+  function getWinner(board) {
+    for (const line of WIN_LINES) {
+      const [a,b,c] = line;
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+        return { winner: board[a], line };
+      }
+    }
+    if (board.every(c => c)) return { winner: 'draw', line: null };
+    return null;
+  }
+
+  function emptyIndices(board) {
+    return board.map((v,i) => v ? null : i).filter(v => v !== null);
+  }
+
+  // minimax for "perfect" bot play
+  function minimax(board, player) {
+    const result = getWinner(board);
+    if (result) {
+      if (result.winner === BOT) return { score: 1 };
+      if (result.winner === HUMAN) return { score: -1 };
+      return { score: 0 };
+    }
+
+    const moves = [];
+    for (const idx of emptyIndices(board)) {
+      const newBoard = board.slice();
+      newBoard[idx] = player;
+      const res = minimax(newBoard, player === BOT ? HUMAN : BOT);
+      moves.push({ index: idx, score: res.score });
+    }
+
+    if (player === BOT) {
+      return moves.reduce((best, m) => m.score > best.score ? m : best);
+    } else {
+      return moves.reduce((best, m) => m.score < best.score ? m : best);
+    }
+  }
+
+  function botMove() {
+    const empties = emptyIndices(cells);
+    if (empties.length === 0) return;
+
+    if (gameFate === 'lose') {
+      // bot plays perfectly -> human can never win this round (win or draw only, for the bot)
+      const best = minimax(cells, BOT);
+      cells[best.index] = BOT;
+    } else {
+      // gameFate === 'win' -> bot NEVER blocks or takes a winning move,
+      // guaranteeing the human wins this round. It still plays "normal-looking"
+      // moves otherwise (prefers center/corners) so it doesn't look braindead.
+      let movedIndex = null;
+
+      const preferredOrder = [4, 0, 2, 6, 8, 1, 3, 5, 7];
+      for (const idx of preferredOrder) {
+        if (!cells[idx]) {
+          // skip this square if taking it would win for the bot
+          const copy = cells.slice();
+          copy[idx] = BOT;
+          const r = getWinner(copy);
+          if (r && r.winner === BOT) continue;
+          movedIndex = idx;
+          break;
+        }
+      }
+      if (movedIndex === null) {
+        movedIndex = empties[Math.floor(Math.random() * empties.length)];
+      }
+      cells[movedIndex] = BOT;
+    }
+  }
+
+  function findImmediateWin(board, player) {
+    for (const idx of emptyIndices(board)) {
+      const copy = board.slice();
+      copy[idx] = player;
+      const r = getWinner(copy);
+      if (r && r.winner === player) return idx;
+    }
+    return null;
+  }
+
+  function handleHumanMove(i) {
+    if (gameOver || cells[i]) return;
+    cells[i] = HUMAN;
+    renderBoard();
+
+    let result = getWinner(cells);
+    if (result) {
+      endGame(result);
+      return;
+    }
+
+    statusEl.textContent = "scuba cat is thinking... 🤔";
+    setTimeout(() => {
+      botMove();
+      renderBoard();
+      result = getWinner(cells);
+      if (result) {
+        endGame(result);
+      } else {
+        statusEl.textContent = "your move! you're ❌";
+      }
+    }, 450);
+  }
+
+  function highlightWinLine(line) {
+    if (!line) return;
+    const cellEls = boardEl.querySelectorAll('.cell');
+    line.forEach(i => cellEls[i].classList.add('win'));
+  }
+
+  function endGame(result) {
+    gameOver = true;
+    if (result.winner === 'draw') {
+      statusEl.textContent = "it's a draw! 🤝";
+      return;
+    }
+
+    highlightWinLine(result.line);
+
+    if (result.winner === HUMAN) {
+      statusEl.textContent = "you won! 🏆";
+      showCelebration();
+    } else {
+      statusEl.textContent = "scuba cat wins this round 🐾";
+    }
+  }
+
+  function showCelebration() {
+    const dancer = dancers[Math.floor(Math.random() * dancers.length)];
+    const line = dancerCelebrationLines[Math.floor(Math.random() * dancerCelebrationLines.length)];
+    dancerEl.textContent = dancer;
+    celebrationTextEl.textContent = line;
+    celebrationEl.classList.add('show');
+  }
+
+  function resetGame() {
+    cells = Array(9).fill(null);
+    gameOver = false;
+    gameFate = pickFate();
+    celebrationEl.classList.remove('show');
+    statusEl.textContent = "your move! you're ❌";
+    renderBoard();
+  }
+
+  resetBtn.addEventListener('click', resetGame);
+  renderBoard();
 </script>
 
 </body>
